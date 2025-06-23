@@ -11,13 +11,25 @@ def docling_converter(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
 
     try:
-        # get blob name from request
-        if 'file' not in req.files:
-            return func.HttpResponse(f"Please upload a file", status_code=400)
+        content_type = req.headers.get('Content-Type')
+        if not content_type or 'multipart/form-data' not in content_type:
+            return func.HttpResponse("Invalid content-type, expecting multipart/form-data", status_code=400)
 
-        user_file = req.Form.Files['file']
+        body = req.get_body()
+        multipart_data = decoder.MultipartDecoder(body, content_type)
+
+        file_part = None
+        for part in multipart_data.parts:
+            if b'name="file"' in part.headers.get(b'Content-Disposition', b''):
+                file_part = part
+                break
+
+        if not file_part:
+            return func.HttpResponse("No file uploaded", status_code=400)
+
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-            user_file.save(temp_file.name)
+            temp_file.write(file_part.content)
+            temp_file.flush()
 
             # process the file to markdown
             converter = DocumentConverter()
@@ -34,4 +46,5 @@ def docling_converter(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(f"Error processing file: {str(e)}", status_code=500)
 
 
-# curl -X POST -F "file=@/Users/isabeltilles/Downloads/testfile.pdf" http://127.0.0.1:5001/docling_converter -o result.md
+# example curl command:
+#   curl -X POST -F "file=@/Users/isabeltilles/Downloads/testfile.pdf" http://localhost:7071/api/docling_converter

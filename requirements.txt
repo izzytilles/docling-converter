@@ -4,4 +4,4 @@
 
 azure-functions
 docling
-tempfile
+requests_toolbelt
